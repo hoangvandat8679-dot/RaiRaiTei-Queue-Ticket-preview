@@ -1,0 +1,41 @@
+name: Đồng bộ preview từ nhánh nâng cấp
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "preview-pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy mã từ nhánh nâng cấp
+        uses: actions/checkout@v4
+        with:
+          repository: hoangvandat8679-dot/RaiRaiTei-Queue-Ticket
+          ref: upgrade/2026-09
+          path: site
+
+      - name: Chuẩn bị GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Đóng gói website preview
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Xuất bản preview
+        id: deployment
+        uses: actions/deploy-pages@v4
