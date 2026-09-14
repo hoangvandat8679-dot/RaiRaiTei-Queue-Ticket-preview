@@ -15,6 +15,8 @@ window.translations = {
         language_button_label: '言語を切り替える（現在：日本語）',
         preview_title: 'プレビュー',
         mobile_print_text: '印刷 / PDF保存',
+        history_undo_label: '元に戻す',
+        history_redo_label: 'やり直す',
         text_collapse: '全画面表示',
         control_panel_title: '設定パネル',
         core_size_label: '本体',
@@ -145,6 +147,8 @@ window.translations = {
         language_button_label: 'Đổi ngôn ngữ (hiện tại: Tiếng Việt)',
         preview_title: 'Xem trước',
         mobile_print_text: 'In / Lưu PDF',
+        history_undo_label: 'Hoàn tác',
+        history_redo_label: 'Làm lại',
         text_collapse: 'Toàn màn hình',
         control_panel_title: 'Bảng điều khiển',
         core_size_label: 'Lõi vé',
@@ -460,6 +464,21 @@ window.applyTranslations = function() {
 
         if (button) {
             const label = window.t('language_button_label');
+            button.setAttribute('aria-label', label);
+            button.title = label;
+        }
+    });
+
+    [
+        ['pc-top-print-btn', 'mobile_print_text'],
+        ['mobile-print-btn', 'mobile_print_text'],
+        ['history-undo', 'history_undo_label'],
+        ['history-redo', 'history_redo_label']
+    ].forEach(([id, key]) => {
+        const button = document.getElementById(id);
+
+        if (button) {
+            const label = window.t(key);
             button.setAttribute('aria-label', label);
             button.title = label;
         }
