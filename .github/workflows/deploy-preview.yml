@@ -1,4 +1,4 @@
-name: Đồng bộ preview từ nhánh nâng cấp
+name: Deploy preview từ repo này
 
 on:
   workflow_dispatch:
@@ -21,12 +21,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Lấy mã từ nhánh nâng cấp
+      - name: Lấy mã từ nhánh main (repo preview)
         uses: actions/checkout@v4
-        with:
-          repository: hoangvandat8679-dot/RaiRaiTei-Queue-Ticket
-          ref: upgrade/2026-09
-          path: site
 
       - name: Chuẩn bị GitHub Pages
         uses: actions/configure-pages@v5
@@ -34,7 +30,7 @@ jobs:
       - name: Đóng gói website preview
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: .
 
       - name: Xuất bản preview
         id: deployment
