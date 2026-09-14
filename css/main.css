@@ -342,7 +342,8 @@ input[type=range]:active::-webkit-slider-thumb { background: #cbfb45; transform:
     border: none !important;
     border-radius: 0 !important;
     background-color: transparent !important;
-    background-image: url('https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-number-frame.png') !important;
+    /* Ảnh được prebake thành data URI trước khi in (xem js/export.js). */
+    background-image: var(--spring-number-frame-image, url('https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-number-frame.png')) !important;
     background-repeat: no-repeat !important;
     background-position: center !important;
     background-size: 100% 100% !important;
@@ -355,7 +356,8 @@ input[type=range]:active::-webkit-slider-thumb { background: #cbfb45; transform:
 .ticket-core.spring-template .branch-name {
     z-index: 2;
     background-color: transparent !important;
-    background-image: url('https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-branch-ribbon.png') !important;
+    /* Ảnh được prebake thành data URI trước khi in (xem js/export.js). */
+    background-image: var(--spring-branch-ribbon-image, url('https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-branch-ribbon.png')) !important;
     background-repeat: no-repeat !important;
     background-position: center !important;
     background-size: 100% 100% !important;

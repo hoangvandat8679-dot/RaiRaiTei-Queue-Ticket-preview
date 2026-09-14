@@ -79,6 +79,158 @@ async function waitForCssBackgroundImages(root) {
 }
 
 /*
+  Biện pháp mạnh chống lỗi in thiếu ảnh của mẫu Mùa Xuân: toàn bộ nền,
+  khung số và ribbon tên chi nhánh đều là background-image CSS tải từ
+  jsDelivr, không phải thẻ <img>. Dù đã chờ ảnh tải xong, WebKit trên
+  iOS vẫn thỉnh thoảng làm rơi ảnh khỏi cache khi dựng canvas/PDF,
+  khiến bản in mất nền hoặc mất khung số.
+
+  Biện pháp mạnh: trước khi in, chuyển từng ảnh thành data URI và ghi
+  vào biến CSS tương ứng ngay trên #master-ticket-inner (inline style). Ảnh nằm sẵn trong DOM
+  nên mọi bản chụp/nhân bản vé (mobile chụp từng vé, PC dán outerHTML
+  vào iframe in) đều tự mang theo ảnh — không còn phụ thuộc mạng/cache.
+
+  Chỉ chạy khi vé đang dùng mẫu Mùa Xuân → các mẫu khác giữ nguyên 100%
+  luồng in cũ. Ảnh người dùng tự tải (đã là data URI) không bị đè.
+*/
+const SPRING_ART_SOURCES = [
+    {
+        cssVar: '--bg-image',
+        fallbackUrl:
+            'https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-background.png'
+    },
+    {
+        cssVar: '--spring-number-frame-image',
+        fallbackUrl:
+            'https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-number-frame.png'
+    },
+    {
+        cssVar: '--spring-branch-ribbon-image',
+        fallbackUrl:
+            'https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-branch-ribbon.png'
+    }
+];
+
+/*
+  Ưu tiên ảnh nền đang có trên document.body (templates.js đặt URL mẫu,
+  image-editor.js đặt data URI khi người dùng tự tải). Chỉ prebake khi
+  đó là URL mạng — không đè nền người dùng tải lên.
+*/
+function getSpringBackgroundSource(artSource) {
+    const bodyOverride = document.body.style
+        .getPropertyValue('--bg-image');
+    const overrideUrl = bodyOverride
+        ? ((bodyOverride.match(/url\(["']?([^"')]+)["']?\)/) || [])[1] || '')
+        : '';
+
+    if (overrideUrl.startsWith('data:')) return null;
+
+    return overrideUrl || artSource.fallbackUrl;
+}
+
+/*
+  Tải ảnh qua fetch (jsDelivr cho phép CORS) rồi đọc thành data URI.
+  Ảnh đã nằm trong HTTP cache sau waitForCssBackgroundImages nên bước
+  này gần như tức thì; nếu lỗi thì caller giữ nguyên URL mạng.
+*/
+async function convertImageUrlToDataUri(imageUrl) {
+    const response = await fetch(imageUrl, {
+        mode: 'cors',
+        cache: 'force-cache'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+    });
+}
+
+/*
+  Trả về style attribute gốc của #master-ticket-inner nếu đã nhúng ảnh
+  (để khôi phục sau khi in), hoặc undefined nếu không có gì thay đổi.
+*/
+async function prebakeSpringTicketArt() {
+    const ticketInner =
+        document.getElementById('master-ticket-inner');
+
+    if (
+        !ticketInner ||
+        !ticketInner.classList.contains('spring-template')
+    ) {
+        return undefined;
+    }
+
+    const previousStyle = ticketInner.getAttribute('style');
+
+    await Promise.all(
+        SPRING_ART_SOURCES.map(async (artSource) => {
+            const artUrl =
+                artSource.cssVar === '--bg-image'
+                    ? getSpringBackgroundSource(artSource)
+                    : artSource.fallbackUrl;
+
+            if (!artUrl || artUrl.startsWith('data:')) return;
+
+            try {
+                const dataUri =
+                    await convertImageUrlToDataUri(artUrl);
+
+                ticketInner.style.setProperty(
+                    artSource.cssVar,
+                    `url("${dataUri}")`
+                );
+            } catch (prebakeError) {
+                /*
+                  Không chuyển được ảnh nào đó thì giữ nguyên URL mạng cho
+                  ảnh đó — cơ chế chờ ảnh cũ vẫn bảo vệ phần còn lại.
+                */
+                console.warn(
+                    'Không thể nhúng ảnh mẫu trước khi in:',
+                    artSource.cssVar,
+                    prebakeError
+                );
+            }
+        })
+    );
+
+    return previousStyle;
+}
+
+function restoreSpringTicketArt(savedStyleAttribute) {
+    if (savedStyleAttribute === undefined) return;
+
+    const ticketInner =
+        document.getElementById('master-ticket-inner');
+
+    if (!ticketInner) return;
+
+    if (savedStyleAttribute === null) {
+        ticketInner.removeAttribute('style');
+    } else {
+        ticketInner.setAttribute('style', savedStyleAttribute);
+    }
+}
+
+/*
+  Mã hoá vé thành JPEG thay PNG: canvas vé có nền trắng đặc (không cần
+  trong suốt), JPEG nén nhanh hơn nhiều trên JS di động và tạo ảnh nhỏ
+  hơn ~10 lần — thời gian toDataURL + addImage + dung lượng PDF đều giảm
+  mạnh. Chất lượng 0.92 ở 360 DPI không thể phân biệt bằng mắt khi in.
+*/
+function encodeTicketImage(canvas) {
+    return canvas.toDataURL('image/jpeg', 0.92);
+}
+
+/*
   Co cỡ số theo độ dài để không tràn khung: 1 chữ số giữ nguyên thiết kế,
   2 chữ số 72%, từ 3 chữ số 55% kích thước gốc.
 */
@@ -89,24 +241,42 @@ function getNumberShrinkFactor(text) {
 }
 
 /*
-  360 DPI dùng chung cho mobile và PC: nét hơn bản mobile cũ,
-  nhưng vẫn cân bằng dung lượng khi gửi PDF tới máy in combini.
-  Tỷ lệ CSS chuẩn là 96 DPI.
+  DPI động thay vì mức 3.75 cố định: vé master 723px CSS in ở khổ chuẩn
+  44mm đã đạt ~417 DPI ở pixelRatio 1 — mức cố định cũ (≈1565 DPI thực,
+  canvas ~12,6 MP mỗi vé) là lấy mẫu quá mức và là lý do chính khiến
+  dựng PDF rất chậm trên mobile. Hàm trả về pixelRatio nhỏ nhất vẫn đạt
+  ngưỡng in 360 DPI (mục tiêu 420 để có biên an toàn); chặn trên 3.75
+  giữ nguyên hành vi cũ cho vé khổ cực lớn. PC in HTML trực tiếp nên
+  không đi qua hàm này.
 */
-function getPdfRasterScale() {
-    return 3.75;
+const PRINT_TARGET_DPI = 360;
+const PRINT_MAX_RASTER_SCALE = 3.75;
+
+function getPdfRasterScale(ticketWidthMm) {
+    if (!ticketWidthMm || ticketWidthMm <= 0) return 1;
+
+    const ticketPx =
+        document.getElementById('master-ticket')?.offsetWidth || 723;
+    const scaleForTargetDpi =
+        (PRINT_TARGET_DPI * ticketWidthMm) / (25.4 * ticketPx);
+
+    return Math.max(
+        1,
+        Math.min(PRINT_MAX_RASTER_SCALE, scaleForTargetDpi)
+    );
 }
 
 async function renderVisibleTicketCanvas(
     ticketElement,
-    fontEmbedCSS
+    fontEmbedCSS,
+    pixelRatio
 ) {
-    const pixelRatio = getPdfRasterScale();
+    const rasterScale = pixelRatio || getPdfRasterScale();
 
     if (window.htmlToImage && window.htmlToImage.toCanvas) {
         return window.htmlToImage.toCanvas(ticketElement, {
             backgroundColor: '#ffffff',
-            pixelRatio,
+            pixelRatio: rasterScale,
             cacheBust: false,
             skipAutoScale: true,
             fontEmbedCSS
@@ -115,7 +285,7 @@ async function renderVisibleTicketCanvas(
 
     if (window.html2canvas) {
         return window.html2canvas(ticketElement, {
-            scale: pixelRatio,
+            scale: rasterScale,
             useCORS: true,
             allowTaint: false,
             backgroundColor: '#ffffff',
@@ -142,6 +312,11 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         ticketW,
         ticketH
     } = layout;
+
+    /*
+      Tính một lần cho cả lượt in: mọi vé cùng khổ nên cùng pixelRatio.
+    */
+    const rasterPixelRatio = getPdfRasterScale(ticketW);
     const pageWidth = orientation === 'landscape' ? 297 : 210;
     const pageHeight = orientation === 'landscape' ? 210 : 297;
     const printableWidth = pageWidth - 10;
@@ -163,6 +338,8 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         ? loadingTitle.textContent
         : '';
 
+    let springArtSavedStyle;
+
     try {
         if (document.fonts && document.fonts.ready) {
             await document.fonts.ready;
@@ -170,6 +347,12 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
 
         await waitForPrintImages(masterTicket);
         await waitForCssBackgroundImages(masterTicket);
+
+        /*
+          Biện pháp mạnh riêng cho mẫu Mùa Xuân: nhúng ảnh nghệ thuật
+          thành data URI trước khi chụp (prebakeSpringTicketArt).
+        */
+        springArtSavedStyle = await prebakeSpringTicketArt();
 
         /*
           Vẽ đủ 10 chữ số để kích hoạt mọi webfont tải trễ, rồi chờ
@@ -204,7 +387,8 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         */
         const warmupCanvas = await renderVisibleTicketCanvas(
             masterTicket,
-            fontEmbedCSS
+            fontEmbedCSS,
+            rasterPixelRatio
         );
         warmupCanvas.width = 1;
         warmupCanvas.height = 1;
@@ -279,12 +463,13 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                     await waitForPaintFrames(2);
                     const canvas = await renderVisibleTicketCanvas(
                         masterTicket,
-                        fontEmbedCSS
+                        fontEmbedCSS,
+                        rasterPixelRatio
                     );
 
                     pdf.addImage(
-                        canvas.toDataURL('image/png'),
-                        'PNG',
+                        encodeTicketImage(canvas),
+                        'JPEG',
                         startX + column * ticketW,
                         startY + row * ticketH,
                         ticketW,
@@ -335,12 +520,13 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
 
             const canvas = await renderVisibleTicketCanvas(
                 masterTicket,
-                fontEmbedCSS
+                fontEmbedCSS,
+                rasterPixelRatio
             );
 
             pdf.addImage(
-                canvas.toDataURL('image/png'),
-                'PNG',
+                encodeTicketImage(canvas),
+                'JPEG',
                 startX + column * ticketW,
                 startY + row * ticketH,
                 ticketW,
@@ -361,6 +547,8 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         if (loadingTitle) {
             loadingTitle.textContent = originalLoadingTitle;
         }
+
+        restoreSpringTicketArt(springArtSavedStyle);
     }
 }
 
@@ -580,11 +768,18 @@ async function printDesktopInIsolatedFrame(
         .map((node) => node.outerHTML)
         .join('\n');
     const duplex = isDuplexPrintEnabled();
+
+    /*
+      Nhúng ảnh nghệ thuật mẫu Mùa Xuân thành data URI TRƯỚC khi đọc
+      outerHTML: bản sao vé trong iframe in sẽ tự mang ảnh theo.
+    */
+    const springArtSavedStyle = await prebakeSpringTicketArt();
     const printHTML = buildPrintPagesHTML(
         ticketsToPrint,
         layout,
         duplex
     );
+    restoreSpringTicketArt(springArtSavedStyle);
     const directPrintStyles = `
         @page {
             size: A4 ${orientation};
