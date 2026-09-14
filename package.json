@@ -1,0 +1,11 @@
+{
+  "name": "rairaitei-queue-ticket-preview",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Development workspace for the RaiRaiTei Queue Ticket Generator (static site)",
+  "scripts": {
+    "dev": "npx --yes serve -l ${PORT:-3000} .",
+    "start": "npx --yes serve -l ${PORT:-3000} .",
+    "build": "echo \"Static site: no build step\" && exit 0"
+  }
+}
