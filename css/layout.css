@@ -14,6 +14,29 @@ html, body { overflow: hidden !important; overscroll-behavior: none; }
 
 #resizer { display: none; } 
 
+/* Nút trở lại trong thanh điều hướng (ảnh 3: mũi tên trong vòng tròn) */
+.nav-back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(156, 163, 175, 0.35);
+    border-radius: 14px;
+    background: #1b1f26;
+    color: #e5e7eb;
+    box-shadow:
+        0 2px 0 rgba(255, 255, 255, 0.06) inset,
+        0 4px 12px rgba(0, 0, 0, 0.45);
+    transition: background .15s ease, transform .1s ease, box-shadow .15s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.nav-back-btn:hover { background: #262b33; }
+.nav-back-btn:active { transform: scale(0.94); box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+.nav-back-btn:focus-visible { outline: 2px solid #cbfb45; outline-offset: 2px; }
+
 /* Nút icon dùng chung (toolbar/nút in): bo nổi, cả mobile + PC */
 .toolbar-icon-btn {
     display: inline-flex;
@@ -124,7 +147,12 @@ html, body { overflow: hidden !important; overscroll-behavior: none; }
     #controls-sidebar #control_panel_title, 
     #controls-sidebar .flex.justify-between.border-b, 
     #controls-sidebar details summary { display: none !important; }
-    
+
+    /* Chế độ Thiết lập: ẩn 3 tab, hiện nút trở lại góc trái thanh */
+    #mobile-category-bar.settings-open { padding: 10px 14px; justify-content: flex-start; }
+    #mobile-category-bar.settings-open .cat-btn { display: none !important; }
+    #mobile-category-bar.settings-open .nav-back-btn { display: inline-flex; }
+
     .mobile-panel { display: none !important; border: none !important; background: transparent !important; padding: 0 !important; margin: 0 !important; }
     .mobile-panel.active-panel { display: block !important; }
     details.mobile-panel.active-panel > div { display: block !important; margin-top: 0 !important; border-top: none !important; padding-top: 0 !important; }
@@ -136,7 +164,9 @@ html, body { overflow: hidden !important; overscroll-behavior: none; }
     #app-wrapper { flex-direction: row; background-color: #111827; }
     #app-container { height: 100% !important; background-color: #1f2937; }
 
-    /* Rail dọc PC: 3 tab icon (Thiết kế mẫu / Cài đặt / Đã lưu) */
+    /* Rail dọc PC: 3 tab icon (Thiết kế mẫu / Cài đặt / Đã lưu) — giữ nguyên khi ở chế độ Thiết lập */
+    #mobile-category-bar.settings-open .cat-btn { display: flex !important; }
+    #mobile-category-bar.settings-open .nav-back-btn { display: none !important; }
     #mobile-category-bar { border-top: none; border-right: 1px solid #2a2f37; }
     #mobile-category-bar .cat-btn { border-left-color: transparent; border-radius: 9999px; }
     #mobile-category-bar .cat-btn.text-\[\#cbfb45\] { border-left-color: #cbfb45; background: rgba(203, 251, 69, 0.08); }

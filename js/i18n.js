@@ -102,6 +102,7 @@ window.translations = {
         history_clear_label: '履歴を消去',
         nav_settings: '設定',
         nav_saved: '保存済み',
+        settings_back_label: '戻る',
         print_loading_title: '印刷データを準備しています…',
         print_loading_desc: 'ブラウザが印刷またはPDF保存画面を開きます。このタブを閉じないでください。',
         force_close_text: '戻る（停止した場合）',
@@ -231,6 +232,7 @@ window.translations = {
         history_clear_label: 'Xóa lịch sử',
         nav_settings: 'Thiết lập',
         nav_saved: 'Đã lưu',
+        settings_back_label: 'Quay lại',
         print_loading_title: 'Đang chuẩn bị dữ liệu in…',
         print_loading_desc: 'Trình duyệt sẽ mở màn hình in hoặc lưu PDF. Vui lòng không đóng thẻ này.',
         force_close_text: 'Quay lại (nếu bị kẹt)',
@@ -469,6 +471,15 @@ window.applyTranslations = function() {
             'aria-label',
             window.t('close_export_label')
         );
+    }
+
+    const settingsBackButton =
+        document.getElementById('settings-back-btn');
+    if (settingsBackButton) {
+        const backLabel = window.t('settings_back_label');
+
+        settingsBackButton.setAttribute('aria-label', backLabel);
+        settingsBackButton.title = backLabel;
     }
 
     window.refreshTranslatedFileNames();

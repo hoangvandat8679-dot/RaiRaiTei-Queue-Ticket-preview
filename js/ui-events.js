@@ -160,9 +160,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     
+    // Chế độ “Thiết lập” (mobile): ẩn tab, mở sheet cài đặt, nút trở lại thay thế tab
+    const applySettingsMode = (enabled) => {
+        categoryBar.classList.toggle('settings-open', enabled);
+        sidebar.classList.toggle('settings-open', enabled);
+    };
+
     // 1. CHUYỂN ĐỔI TAB VÀ ĐÓNG/MỞ Ở ĐIỆN THOẠI
     const catBtns = document.querySelectorAll('.cat-btn');
     const panels = document.querySelectorAll('.mobile-panel');
+
+    const closeMobileSheet = () => {
+        applySettingsMode(false);
+        sidebar.classList.remove('sheet-open');
+        appContainer.classList.remove('pushed-up');
+        catBtns.forEach(b => {
+            b.classList.remove('text-[#cbfb45]', 'border-[#cbfb45]', 'bg-[#cbfb45]/10');
+            b.classList.add('text-gray-500', 'border-transparent');
+        });
+        panels.forEach(p => p.classList.remove('active-panel'));
+        fitMobilePreview();
+    };
 
     catBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -176,16 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (window.innerWidth < 768 && isOpen && isThisTabActive) {
-                sidebar.classList.remove('sheet-open'); 
-                appContainer.classList.remove('pushed-up');
-                catBtns.forEach(b => {
-                    b.classList.remove('text-[#cbfb45]', 'border-[#cbfb45]', 'bg-[#cbfb45]/10');
-                    b.classList.add('text-gray-500', 'border-transparent');
-                });
-                panels.forEach(p => p.classList.remove('active-panel'));
-                fitMobilePreview();
+                closeMobileSheet();
                 return; 
             }
+
+            applySettingsMode(btn.getAttribute('data-group') === 'settings');
 
             catBtns.forEach(b => {
                 b.classList.remove('text-[#cbfb45]', 'border-[#cbfb45]', 'bg-[#cbfb45]/10');
@@ -209,16 +222,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Nút trở lại: đóng sheet và khôi phục thanh tab
+    const backBtn = document.getElementById('settings-back-btn');
+    backBtn.addEventListener('click', () => {
+        closeMobileSheet();
+    });
+
     previewArea.addEventListener('click', () => {
         if(window.innerWidth < 768 && sidebar.classList.contains('sheet-open')) {
-            sidebar.classList.remove('sheet-open'); 
-            appContainer.classList.remove('pushed-up');
-            catBtns.forEach(b => {
-                b.classList.remove('text-[#cbfb45]', 'border-[#cbfb45]', 'bg-[#cbfb45]/10');
-                b.classList.add('text-gray-500', 'border-transparent');
-            });
-            panels.forEach(p => p.classList.remove('active-panel'));
-            fitMobilePreview();
+            closeMobileSheet();
         }
     });
 
