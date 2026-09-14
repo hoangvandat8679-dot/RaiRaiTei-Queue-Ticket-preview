@@ -46,6 +46,49 @@ async function waitForPrintImages(root) {
 }
 
 /*
+  Nền/khung số/dải băng của mẫu Mùa Xuân là background-image CSS (tải từ
+  CDN), không phải thẻ <img> — bộ chụp có thể vẽ thiếu nếu ảnh chưa về.
+*/
+async function waitForCssBackgroundImages(root) {
+    const urls = new Set();
+
+    Array.from(root.querySelectorAll('*')).forEach((element) => {
+        const backgroundImage = window.getComputedStyle(element)
+            .backgroundImage;
+
+        if (!backgroundImage || backgroundImage === 'none') return;
+
+        const pattern = /url\(["']?([^"')]+)["']?\)/g;
+        let match;
+
+        while ((match = pattern.exec(backgroundImage)) !== null) {
+            urls.add(match[1]);
+        }
+    });
+
+    await Promise.all(
+        Array.from(urls).map((url) => new Promise((resolve) => {
+            const probe = new Image();
+
+            probe.crossOrigin = 'anonymous';
+            probe.onload = resolve;
+            probe.onerror = resolve;
+            probe.src = url;
+        }))
+    );
+}
+
+/*
+  Co cỡ số theo độ dài để không tràn khung: 1 chữ số giữ nguyên thiết kế,
+  2 chữ số 72%, từ 3 chữ số 55% kích thước gốc.
+*/
+function getNumberShrinkFactor(text) {
+    if (text.length >= 3) return 0.55;
+    if (text.length === 2) return 0.72;
+    return 1;
+}
+
+/*
   360 DPI dùng chung cho mobile và PC: nét hơn bản mobile cũ,
   nhưng vẫn cân bằng dung lượng khi gửi PDF tới máy in combini.
   Tỷ lệ CSS chuẩn là 96 DPI.
@@ -112,6 +155,8 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         Math.max(0, (printableHeight - bestRows * ticketH) / 2);
     const masterTicket = document.getElementById('master-ticket');
     const previewNumber = document.getElementById('preview-number');
+    const previewBaseFontSize = window.getComputedStyle(previewNumber)
+        .fontSize;
     const loadingTitle = document.getElementById('print_loading_title');
     const originalNumber = previewNumber.textContent;
     const originalLoadingTitle = loadingTitle
@@ -124,6 +169,20 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         }
 
         await waitForPrintImages(masterTicket);
+        await waitForCssBackgroundImages(masterTicket);
+
+        /*
+          Vẽ đủ 10 chữ số để kích hoạt mọi webfont tải trễ, rồi chờ
+          fonts.ready lần nữa. Nếu bỏ qua, các vé chụp sau khi font vừa
+          tải xong sẽ dùng font khác (số to/lệch khung so với phần còn
+          lại của trang) — đúng lỗi thấy ở số 10–12 khi in mẫu Mùa Xuân.
+        */
+        previewNumber.textContent = '0123456789';
+        await waitForPaintFrames(2);
+
+        if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+        }
 
         let fontEmbedCSS;
 
@@ -197,7 +256,14 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
 
                     const column = cellIndex % bestCols;
                     const row = Math.floor(cellIndex / bestCols);
-                    previewNumber.textContent = String(ticketNumber);
+                    const numberText = String(ticketNumber);
+
+                    previewNumber.textContent = numberText;
+                    previewNumber.style.fontSize =
+                        getNumberShrinkFactor(numberText) < 1
+                            ? `${parseFloat(previewBaseFontSize) *
+                                getNumberShrinkFactor(numberText)}px`
+                            : '';
                     completedTickets++;
 
                     if (loadingTitle) {
@@ -246,7 +312,14 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                 activePage = pageIndex;
             }
 
-            previewNumber.textContent = String(ticketsToPrint[index]);
+            const numberText = String(ticketsToPrint[index]);
+
+            previewNumber.textContent = numberText;
+            previewNumber.style.fontSize =
+                getNumberShrinkFactor(numberText) < 1
+                    ? `${parseFloat(previewBaseFontSize) *
+                        getNumberShrinkFactor(numberText)}px`
+                    : '';
 
             if (loadingTitle) {
                 loadingTitle.textContent = window.t(
@@ -283,6 +356,7 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         return pdf.output('blob');
     } finally {
         previewNumber.textContent = originalNumber;
+        previewNumber.style.fontSize = '';
 
         if (loadingTitle) {
             loadingTitle.textContent = originalLoadingTitle;
@@ -665,6 +739,7 @@ async function printDesktopInIsolatedFrame(
     }
 
     await waitForPrintImages(printRoot);
+    await waitForCssBackgroundImages(printRoot);
     await waitForPaintFrames(2);
 
     const frameWindow = frame.contentWindow;

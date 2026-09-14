@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         */
         document.body.style.setProperty(
             '--bg-image',
-            "url('https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/RaiRaiTei-Queue-Ticket@upgrade/2026-09/assets/images/templates/spring-background.png')"
+            "url('https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/spring-background.png')"
         );
 
         if (window.applyControlPreset) {
