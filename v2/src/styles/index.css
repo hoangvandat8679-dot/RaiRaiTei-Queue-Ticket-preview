@@ -1,0 +1,23 @@
+:root {
+  color: #f3f4f6;
+  background: #111111;
+  font-family: Inter, 'Noto Sans JP', sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: #111111;
+}
+
+#app-root {
+  min-height: 100vh;
+  padding: 2rem;
+}

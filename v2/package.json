@@ -1,0 +1,30 @@
+{
+  "name": "rairaitei-queue-ticket-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write index.html src tests *.json *.ts *.mjs",
+    "format:check": "prettier --check index.html src tests *.json *.ts *.mjs",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^22.10.5",
+    "eslint": "^9.17.0",
+    "jsdom": "^25.0.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.1",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}
