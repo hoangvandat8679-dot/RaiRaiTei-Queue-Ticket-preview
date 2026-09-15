@@ -14,17 +14,25 @@
     "test": "vitest",
     "test:run": "vitest run"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/noto-sans-jp": "5.3.0",
+    "html-to-image": "1.11.11",
+    "html2canvas": "1.4.1",
+    "jspdf": "4.2.1"
+  },
   "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "@types/jsdom": "^21.1.7",
-    "@types/node": "^22.10.5",
-    "eslint": "^9.17.0",
-    "jsdom": "^25.0.1",
-    "prettier": "^3.4.2",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.19.1",
-    "vite": "^6.0.7",
-    "vitest": "^2.1.8"
+    "@eslint/js": "9.17.0",
+    "@playwright/test": "1.63.0",
+    "@types/jsdom": "21.1.7",
+    "@types/node": "22.20.2",
+    "eslint": "9.17.0",
+    "jsdom": "25.0.1",
+    "pdfjs-dist": "6.3.289",
+    "prettier": "3.4.2",
+    "typescript": "5.7.2",
+    "typescript-eslint": "8.19.1",
+    "vite": "8.3.0",
+    "vitest": "5.0.0"
   }
 }

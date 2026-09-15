@@ -1,0 +1,11 @@
+Original asset checksums (downloaded from the V1 jsDelivr URLs)
+
+Source URL base: https://cdn.jsdelivr.net/gh/hoangvandat8679-dot/assets-images@main/
+
+File                         Bytes      SHA-256
+mascot.png                   732854     f19b0ed8940bd83579a77fd307ea0af8f9f136e160ad6fb8aa4868aec41fa4d4
+spring-background.png        1451295    1d0ddbc8e34c057348bf9635512e4ad5e3170b80b33b6102fb80a0ca8471b369
+spring-number-frame.png      30852      9e737ff73561baf7f6dafe4debee360becec069585808afa362c02938f293722
+spring-branch-ribbon.png     25086      db41b77db237d0a1c0c310e8ee74adf0e15633f47d336a29b0cd18dcc0378fdf
+
+v2/public/assets contains byte-identical copies; no lossy or lossless transformation was applied.
