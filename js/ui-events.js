@@ -81,12 +81,21 @@ window.guardInAppBrowserForPrint = function() {
 
     if (!browserName) return true;
 
-    alert(
-        window.t(
-            'in_app_browser_warning',
-            { browser: browserName }
-        )
-    );
+    if (window.showAppNotice) {
+        window.showAppNotice(
+            window.t(
+                'in_app_browser_warning',
+                { browser: browserName }
+            )
+        );
+    } else {
+        alert(
+            window.t(
+                'in_app_browser_warning',
+                { browser: browserName }
+            )
+        );
+    }
     return false;
 };
 

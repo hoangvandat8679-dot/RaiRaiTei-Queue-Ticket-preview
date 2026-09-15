@@ -13,6 +13,34 @@ function waitForPaintFrames(frameCount = 2) {
     });
 }
 
+/*
+  Thay alert() của trình duyệt: hộp thoại hệ thống luôn kèm dòng
+  "Một trang được nhúng tại <URL> cho biết" không thể đổi được, nên
+  thông báo riêng của ứng dụng là cách duy nhất kiểm soát nội dung.
+*/
+function showAppNotice(message) {
+    const notice = document.getElementById('app-notice');
+    const messageElement = document.getElementById('app-notice-message');
+    const closeButton = document.getElementById('app-notice-close');
+
+    if (!notice || !messageElement || !closeButton) {
+        alert(message);
+        return;
+    }
+
+    messageElement.textContent = message;
+    notice.classList.remove('hidden');
+    notice.classList.add('flex');
+
+    const closeNotice = () => {
+        notice.classList.add('hidden');
+        notice.classList.remove('flex');
+        closeButton.removeEventListener('click', closeNotice);
+    };
+
+    closeButton.addEventListener('click', closeNotice, { once: true });
+}
+
 async function waitForPrintImages(root) {
     const images = Array.from(root.querySelectorAll('img'));
 
@@ -241,6 +269,86 @@ function getNumberShrinkFactor(text) {
 }
 
 /*
+  Đo hình học số vé MỘT LẦN cho cả lượt in. Khung số căn giữa bằng flex
+  nên tâm hiển thị không đổi theo nội dung — đủ để vẽ số bằng canvas 2D
+  đúng vị trí DOM. Tâm đo theo tỉ lệ so với vé (hai phần tử cùng nằm
+  trong một ancestor transform nên tỉ lệ khử được scale preview).
+  Trả về null nếu số/t obscure bị ẩn → không vẽ số đè lên nền.
+*/
+function measureTicketNumberMetrics(
+    masterTicket,
+    numberElement,
+    rasterPixelRatio
+) {
+    if (!numberElement) return null;
+
+    const numberStyle = window.getComputedStyle(numberElement);
+
+    if (
+        numberStyle.display === 'none' ||
+        numberStyle.visibility === 'hidden'
+    ) {
+        return null;
+    }
+
+    const numberFrame = numberElement.parentElement;
+
+    if (numberFrame) {
+        const frameStyle = window.getComputedStyle(numberFrame);
+
+        if (
+            frameStyle.display === 'none' ||
+            frameStyle.visibility === 'hidden'
+        ) {
+            return null;
+        }
+    }
+
+    const ticketRect = masterTicket.getBoundingClientRect();
+    const numberRect = numberElement.getBoundingClientRect();
+
+    if (ticketRect.width === 0 || ticketRect.height === 0) return null;
+
+    return {
+        pixelRatio: rasterPixelRatio,
+        fontSizePx: parseFloat(numberStyle.fontSize),
+        fontWeight: numberStyle.fontWeight,
+        fontFamily: numberStyle.fontFamily,
+        color: numberStyle.color,
+        centerRatioX:
+            (numberRect.left + numberRect.width / 2 - ticketRect.left) /
+            ticketRect.width,
+        centerRatioY:
+            (numberRect.top + numberRect.height / 2 - ticketRect.top) /
+            ticketRect.height
+    };
+}
+
+/*
+  Vẽ số thứ tự lên canvas vé bằng API 2D thuần thay vì chụp lại DOM:
+  cùng tâm, cùng phông/màu với hiển thị DOM, cùng luật co chữ số.
+  Nhanh hơn hàng chục lần so với serialize lại SVG foreignObject.
+*/
+function drawTicketNumberOnCanvas(canvasContext, metrics, numberText) {
+    if (!metrics) return;
+
+    const shrinkFactor = getNumberShrinkFactor(numberText);
+
+    canvasContext.textAlign = 'center';
+    canvasContext.textBaseline = 'middle';
+    canvasContext.fillStyle = metrics.color;
+    canvasContext.font =
+        `${metrics.fontWeight} ` +
+        `${metrics.fontSizePx * shrinkFactor * metrics.pixelRatio}px ` +
+        metrics.fontFamily;
+    canvasContext.fillText(
+        numberText,
+        metrics.centerRatioX * canvasContext.canvas.width,
+        metrics.centerRatioY * canvasContext.canvas.height
+    );
+}
+
+/*
   DPI động thay vì mức 3.75 cố định: vé master 723px CSS in ở khổ chuẩn
   44mm đã đạt ~417 DPI ở pixelRatio 1 — mức cố định cũ (≈1565 DPI thực,
   canvas ~12,6 MP mỗi vé) là lấy mẫu quá mức và là lý do chính khiến
@@ -330,8 +438,6 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         Math.max(0, (printableHeight - bestRows * ticketH) / 2);
     const masterTicket = document.getElementById('master-ticket');
     const previewNumber = document.getElementById('preview-number');
-    const previewBaseFontSize = window.getComputedStyle(previewNumber)
-        .fontSize;
     const loadingTitle = document.getElementById('print_loading_title');
     const originalNumber = previewNumber.textContent;
     const originalLoadingTitle = loadingTitle
@@ -382,6 +488,26 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         }
 
         /*
+          Đo tâm/phông số vé TRƯỚC khi xoá nội dung: tâm flex căn giữa
+          không phụ thuộc nội dung nên hợp lệ cho mọi số.
+        */
+        const numberMetrics = measureTicketNumberMetrics(
+            masterTicket,
+            previewNumber,
+            rasterPixelRatio
+        );
+
+        /*
+          Chụp nền vé (số để trống) đúng MỘT LẦN cho cả lượt in. Mỗi vé
+          sau đó chỉ là drawImage nền + vẽ số bằng canvas 2D: loại bỏ
+          hoàn toàn N-1 lần serialize DOM/nhúng phông của html-to-image
+          (nguyên nhân chính khiến in mobile mất ~10-20s mỗi vé dù DPI
+          đã hạ). Công chụp cố định 2 canvas bất kể số vé.
+        */
+        previewNumber.textContent = '';
+        await waitForPaintFrames(2);
+
+        /*
           Warm up the WebKit capture pipeline once. The discarded canvas
           prevents the first real ticket from losing its mascot on iOS.
         */
@@ -392,6 +518,20 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
         );
         warmupCanvas.width = 1;
         warmupCanvas.height = 1;
+        await waitForPaintFrames(2);
+
+        const baseTicketCanvas = await renderVisibleTicketCanvas(
+            masterTicket,
+            fontEmbedCSS,
+            rasterPixelRatio
+        );
+        const printCanvas = document.createElement('canvas');
+
+        printCanvas.width = baseTicketCanvas.width;
+        printCanvas.height = baseTicketCanvas.height;
+
+        const printContext = printCanvas.getContext('2d');
+
         await waitForPaintFrames(2);
 
         const pdf = new JsPDF({
@@ -442,12 +582,6 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                     const row = Math.floor(cellIndex / bestCols);
                     const numberText = String(ticketNumber);
 
-                    previewNumber.textContent = numberText;
-                    previewNumber.style.fontSize =
-                        getNumberShrinkFactor(numberText) < 1
-                            ? `${parseFloat(previewBaseFontSize) *
-                                getNumberShrinkFactor(numberText)}px`
-                            : '';
                     completedTickets++;
 
                     if (loadingTitle) {
@@ -460,15 +594,19 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                         );
                     }
 
-                    await waitForPaintFrames(2);
-                    const canvas = await renderVisibleTicketCanvas(
-                        masterTicket,
-                        fontEmbedCSS,
-                        rasterPixelRatio
+                    printContext.drawImage(
+                        baseTicketCanvas,
+                        0,
+                        0
+                    );
+                    drawTicketNumberOnCanvas(
+                        printContext,
+                        numberMetrics,
+                        numberText
                     );
 
                     pdf.addImage(
-                        encodeTicketImage(canvas),
+                        encodeTicketImage(printCanvas),
                         'JPEG',
                         startX + column * ticketW,
                         startY + row * ticketH,
@@ -477,11 +615,13 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                         undefined,
                         'FAST'
                     );
-
-                    canvas.width = 1;
-                    canvas.height = 1;
                 }
             }
+
+            printCanvas.width = 1;
+            printCanvas.height = 1;
+            baseTicketCanvas.width = 1;
+            baseTicketCanvas.height = 1;
 
             return pdf.output('blob');
         }
@@ -499,13 +639,6 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
 
             const numberText = String(ticketsToPrint[index]);
 
-            previewNumber.textContent = numberText;
-            previewNumber.style.fontSize =
-                getNumberShrinkFactor(numberText) < 1
-                    ? `${parseFloat(previewBaseFontSize) *
-                        getNumberShrinkFactor(numberText)}px`
-                    : '';
-
             if (loadingTitle) {
                 loadingTitle.textContent = window.t(
                     'progress_ticket',
@@ -516,16 +649,15 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                 );
             }
 
-            await waitForPaintFrames(2);
-
-            const canvas = await renderVisibleTicketCanvas(
-                masterTicket,
-                fontEmbedCSS,
-                rasterPixelRatio
+            printContext.drawImage(baseTicketCanvas, 0, 0);
+            drawTicketNumberOnCanvas(
+                printContext,
+                numberMetrics,
+                numberText
             );
 
             pdf.addImage(
-                encodeTicketImage(canvas),
+                encodeTicketImage(printCanvas),
                 'JPEG',
                 startX + column * ticketW,
                 startY + row * ticketH,
@@ -534,20 +666,20 @@ async function buildPrintPdfBlob(ticketsToPrint, orientation, layout) {
                 undefined,
                 'FAST'
             );
-
-            canvas.width = 1;
-            canvas.height = 1;
         }
+
+        printCanvas.width = 1;
+        printCanvas.height = 1;
+        baseTicketCanvas.width = 1;
+        baseTicketCanvas.height = 1;
 
         return pdf.output('blob');
     } finally {
         previewNumber.textContent = originalNumber;
-        previewNumber.style.fontSize = '';
 
         if (loadingTitle) {
             loadingTitle.textContent = originalLoadingTitle;
         }
-
         restoreSpringTicketArt(springArtSavedStyle);
     }
 }
@@ -999,7 +1131,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalTickets = ticketsToPrint.length;
 
             if (totalTickets === 0) {
-                alert(window.t('error_invalid_quantity'));
+                showAppNotice(window.t('error_invalid_quantity'));
                 return;
             }
 
@@ -1009,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bestCols < 1 ||
                 bestRows < 1
             ) {
-                alert(window.t('error_ticket_too_large'));
+                showAppNotice(window.t('error_ticket_too_large'));
                 return;
             }
 
@@ -1070,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     pdfTab.location.replace(pdfUrl);
                     pdfTab.focus();
                 } else {
-                    alert(window.t('popup_blocked_notice'));
+                    showAppNotice(window.t('popup_blocked_notice'));
 
                     const link = document.createElement('a');
                     link.href = pdfUrl;
@@ -1096,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error(error);
-            alert(window.t('error_pdf_create'));
+            showAppNotice(window.t('error_pdf_create'));
         }
     });
 
@@ -1151,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error(error);
-            alert(window.t('error_backup_create'));
+            showAppNotice(window.t('error_backup_create'));
         } finally {
             btn.disabled = false;
 
@@ -1196,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : false;
 
         if (!applied) {
-            alert(window.t('error_backup_create'));
+            showAppNotice(window.t('error_backup_create'));
             return;
         }
 
